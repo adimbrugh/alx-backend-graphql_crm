@@ -8,6 +8,12 @@ from django.utils import timezone
 from .models import Customer, Product, Order
 from graphene_django.filter import DjangoFilterConnectionField
 from .filters import CustomerFilter, ProductFilter, OrderFilter
+#from django.core.exceptions import ValidationError
+#from django.db.utils import IntegrityError
+#from django.core.validators import validate_email
+
+
+
 
 # --- GraphQL Types ---
 class CustomerType(DjangoObjectType):
@@ -25,18 +31,45 @@ class OrderType(DjangoObjectType):
         model = Order
         fields = "__all__"
 
+        
+
 # --- Input Types for bulk creation ---
 class CustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
     phone = graphene.String()
+    
+class ProductInput(graphene.InputObjectType):
+    name = graphene.String(required=True)
+    price = graphene.Decimal(required=True)
+    stock = graphene.Int()
 
+class OrderInput(graphene.InputObjectType):
+    customer_id = graphene.ID(required=True)
+    product_ids = graphene.List(graphene.ID, required=True)
+    order_date = graphene.DateTime()
+    
+    
+    
+# Error Types
+class ErrorType(graphene.ObjectType):
+    field = graphene.String()
+    messages = graphene.List(graphene.String)
+
+class MutationResult(graphene.Union):
+    class Meta:
+        types = (CustomerType, ProductType, OrderType, ErrorType)
+    
+    
+#############
 # --- Validation helper ---
 def validate_phone(phone):
     if phone is None:
         return True
     pattern = re.compile(r"^\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}$")
     return bool(pattern.match(phone))
+
+
 
 # --- Mutations ---
 class CreateCustomer(graphene.Mutation):
@@ -55,6 +88,8 @@ class CreateCustomer(graphene.Mutation):
             raise Exception("Invalid phone format")
         customer = Customer.objects.create(name=name, email=email, phone=phone)
         return CreateCustomer(customer=customer, message="Customer created successfully")
+
+
 
 class BulkCreateCustomers(graphene.Mutation):
     class Arguments:
@@ -87,6 +122,8 @@ class BulkCreateCustomers(graphene.Mutation):
 
         return BulkCreateCustomers(customers=created_customers, errors=errors)
 
+
+
 class CreateProduct(graphene.Mutation):
     class Arguments:
         name = graphene.String(required=True)
@@ -102,6 +139,8 @@ class CreateProduct(graphene.Mutation):
             raise Exception("Stock cannot be negative")
         product = Product.objects.create(name=name, price=price, stock=stock)
         return CreateProduct(product=product)
+
+
 
 class CreateOrder(graphene.Mutation):
     class Arguments:
@@ -135,20 +174,24 @@ class CreateOrder(graphene.Mutation):
 
         return CreateOrder(order=order)
 
+
+"""
 # --- Root Query and Mutation ---
 class Query(graphene.ObjectType):
     customers = graphene.List(CustomerType)
     products = graphene.List(ProductType)
     orders = graphene.List(OrderType)
 
-    def resolve_customers(self, info):
+    def resolve_customers(root, info):
         return Customer.objects.all()
 
-    def resolve_products(self, info):
+    def resolve_products(root, info):
         return Product.objects.all()
 
-    def resolve_orders(self, info):
-        return Order.objects.all()
+    def resolve_orders(root, info):
+        return Order.objects.select_related('customer').prefetch_related('products').all()
+"""
+
 
 class Mutation(graphene.ObjectType):
     create_customer = CreateCustomer.Field()
@@ -178,9 +221,35 @@ class OrderNode(DjangoObjectType):
         interfaces = (graphene.relay.Node,)
 
 
+
+# --- Root Query and Mutation ---
 class Query(graphene.ObjectType):
+    customers = graphene.List(CustomerType)
+    customer = graphene.relay.Node.Field(CustomerNode)
     all_customers = DjangoFilterConnectionField(CustomerNode)
+
+    products = graphene.List(ProductType)
+    product = graphene.relay.Node.Field(ProductNode)
     all_products = DjangoFilterConnectionField(ProductNode)
+
+    orders = graphene.List(OrderType)
+    order = graphene.relay.Node.Field(OrderNode)
     all_orders = DjangoFilterConnectionField(OrderNode)
 
+    def resolve_customers(root, info):
+        return Customer.objects.all()
 
+    def resolve_products(root, info):
+        return Product.objects.all()
+
+    def resolve_orders(root, info):
+        return Order.objects.select_related('customer').prefetch_related('products').all()
+    
+    def resolve_all_customers(self, info, **kwargs):
+        return CustomerFilter(kwargs).qs
+
+    def resolve_all_products(self, info, **kwargs):
+        return ProductFilter(kwargs).qs
+
+    def resolve_all_orders(self, info, **kwargs):
+        return OrderFilter(kwargs).qs
