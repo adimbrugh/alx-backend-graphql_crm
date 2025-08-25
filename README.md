@@ -226,3 +226,107 @@ E-commerce APIs (Products, Categories, Orders)
 📜 License
 
 MIT License
+
+--- 
+
+---
+
+CRM GraphQL & Task Automation
+
+This project extends the alx-backend-graphql_crm repository with GraphQL, scheduled cron jobs, and Celery tasks for CRM automation.
+
+---
+
+📌 Features Implemented
+1. Add GraphQL to CRM
+
+Installed graphene-django.
+
+Added GraphQL endpoint at /graphql/.
+
+Configured crm/schema.py with a root Query and mutations.
+
+Verified with GraphiQL or Insomnia.
+
+---
+
+2. GraphQL Query for Hello Field
+
+Defined a simple hello query in crm/schema.py that returns "Hello, world!".
+
+Used to test the GraphQL endpoint responsiveness.
+
+---
+
+3. Scheduled GraphQL Mutation for Low Stock Products
+
+Added UpdateLowStockProducts mutation in crm/schema.py.
+
+Mutation finds products with stock < 10, increments by 10, and returns updated product list.
+
+Created cron job in crm/cron.py with django-crontab to run every 12 hours.
+
+Logs results in /tmp/low_stock_updates_log.txt.
+
+CRONJOBS = [
+    ('0 */12 * * *', 'crm.cron.update_low_stock'),
+]
+
+---
+
+4. Celery Task for CRM Weekly Report
+
+Installed celery and django-celery-beat.
+
+Configured crm/celery.py with Redis broker.
+
+Added crm/tasks.py with generate_crm_report task:
+
+Queries GraphQL for total customers, orders, and revenue.
+
+Logs to /tmp/crm_report_log.txt with timestamp.
+
+Scheduled with Celery Beat to run every Monday at 06:00.
+
+CELERY_BEAT_SCHEDULE = {
+    'generate-crm-report': {
+        'task': 'crm.tasks.generate_crm_report',
+        'schedule': crontab(day_of_week='mon', hour=6, minute=0),
+    },
+}
+
+---
+
+5. Documentation & Setup Instructions
+🔧 Installation
+pip install -r requirements.txt
+python manage.py migrate
+
+🚀 Run GraphQL API
+python manage.py runserver
+
+⏰ Run Cron Jobs
+# Add cron jobs
+python manage.py crontab add  
+
+# Show scheduled jobs
+python manage.py crontab show  
+
+# Remove cron jobs
+python manage.py crontab remove
+
+⚡ Run Celery & Celery Beat
+# Start Redis (ensure redis-server is running)
+redis-server
+
+# Start Celery worker
+celery -A crm worker -l info  
+
+# Start Celery Beat
+celery -A crm beat -l info
+
+---
+
+📜 Logs
+Low stock updates → /tmp/low_stock_updates_log.txt
+Weekly CRM report → /tmp/crm_report_log.txt
