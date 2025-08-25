@@ -1,0 +1,4 @@
+
+
+
+0 8 * * * alx-backend-graphql_crm/crm/cron_jobs/send_order_reminders.py
