@@ -9,7 +9,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from .filters import CustomerFilter, ProductFilter, OrderFilter
 from graphene_django import DjangoObjectType, DjangoFilterConnectionField
-
+from crm.models import Product
 
 
 # --- GraphQL Types ---
