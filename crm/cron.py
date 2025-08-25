@@ -1,9 +1,12 @@
 
 
-import datetime
+
 import os
+import datetime
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
+
+
 
 def log_crm_heartbeat():
     # Log message with timestamp
@@ -44,3 +47,38 @@ def log_crm_heartbeat():
         error_message = f"{timestamp} GraphQL query failed: {str(e)}\n"
         with open(log_file, "a") as f:
             f.write(error_message)
+
+def update_low_stock():
+    # GraphQL endpoint
+    transport = RequestsHTTPTransport(
+        url="http://127.0.0.1:8000/graphql/",
+        use_json=True,
+    )
+    client = Client(transport=transport, fetch_schema_from_transport=True)
+
+    # Define mutation
+    mutation = gql(
+        """
+        mutation {
+            updateLowStockProducts {
+                updatedProducts {
+                    id
+                    name
+                    stock
+                }
+                message
+            }
+        }
+        """
+    )
+
+    # Execute mutation
+    response = client.execute(mutation)
+
+    timestamp = datetime.datetime.now().strftime("%d/%m/%Y-%H:%M:%S")
+    log_file = "/tmp/low_stock_updates_log.txt"
+
+    with open(log_file, "a") as f:
+        f.write(f"\n[{timestamp}] {response['updateLowStockProducts']['message']}\n")
+        for product in response["updateLowStockProducts"]["updatedProducts"]:
+            f.write(f" - {product['name']} (New Stock: {product['stock']})\n")
